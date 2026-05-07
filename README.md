@@ -1,5 +1,5 @@
 # BHSR-Net
-The official code for BHSR-Net.
+The official code for BHSR-Net: Blur-Resistant Hyperspectral Image Super-Resolution via Dual-Degradation Fusion Model
 
 ## 1. Introduction
 The deep unfolding network represents a promising research avenue in fusion-based hyperspectral image super-resolution (HSI-SR). However, most current deep unfolding methodologies are anchored in idealized observation models, which overlook the degradation of the multispectral image (MSI), hindering their SR performance and practical applicability.
