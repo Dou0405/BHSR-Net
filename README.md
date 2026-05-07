@@ -23,10 +23,9 @@ The project structure is organized as follows based on the provided repository:
     * `utils/datasets.py`: Logic for dataset handling and patch extraction.
     * `utils/metrics.py`: Evaluation metrics including PSNR, SSIM, SAM, UQI, and ERGAS.
     * `utils/display.py`: Tools for result visualization and saving `.mat` files.
-* **Data & Scripts**:
-    * `data/SRF/`: Contains Spectral Response Functions (SRF) for various datasets (Nikon, Landsat, WorldView-2).
+* **Scripts**:
+    * `data/SRF/`: Contains Spectral Response Functions (SRF) for various datasets.
     * `train.py`: A reference training script provided for convenience.
-    * `LICENSE`: MIT License information.
 
 ## 3. How to Reproduce
 To reproduce the results presented in our paper, please follow these guidelines:
