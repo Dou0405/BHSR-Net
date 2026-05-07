@@ -1,5 +1,9 @@
+# -----------------------------------------------------------------------------
+# If you use this code in your research, please cite our paper:
+# Blur-Resistant Hyperspectral Image Super-Resolution via Dual-Degradation Fusion Model
+# Thanks
+# -----------------------------------------------------------------------------
 import os
-import torch
 import numpy as np
 import torch.utils.data as data
 import scipy.io as sio
@@ -8,35 +12,31 @@ from utils.degradation import getPSF, spatial_blur
 np.random.seed(42)
 
 def extract_patches_small(img):
-    #CAVE\HARVARD数据集的图像分块
     C, H, W = img.shape
     window_H = H // 4  
     window_W = W // 4  
-    stride_H = int(window_H // 2)     # 步幅（重叠分块）
-    stride_W = int(window_W // 2)     # 步幅（重叠分块）
-    nh = (H - window_H) // stride_H + 1  # 高度方向补丁数
-    nw = (W - window_W) // stride_W + 1  # 宽度方向补丁数
+    stride_H = int(window_H // 2)     
+    stride_W = int(window_W // 2)     
+    nh = (H - window_H) // stride_H + 1  
+    nw = (W - window_W) // stride_W + 1  
     
-    # 预分配输出数组
     patches = np.empty((nh * nw, C, window_H, window_W), dtype=img.dtype)
     
     patch_idx = 0
     for i in range(nh):
         for j in range(nw):
-            # 计算当前补丁在原图中的位置
             h_start = i * stride_H
             h_end = h_start + window_H
             w_start = j * stride_W
             w_end = w_start + window_W
             
-            # 提取补丁并存储到输出数组
             patches[patch_idx] = img[:, h_start:h_end, w_start:w_end]
             patch_idx += 1
     
     return patches
 
-class HSI_MSI_Data(data.Dataset): # 读取数据集,预处理，数据增强等
-    def __init__(self, mode, psf, srf, split, dataset, datarange, kernel_path=None, aug=False, scale_factor=8, data_path='data', noise=0, normalize=True):
+class HSI_MSI_Data(data.Dataset): 
+    def __init__(self, mode, psf, srf, split, dataset, datarange, kernel_path=None, aug=False, scale_factor=8, data_path='data', blur=0, normalize=True):
         if mode not in ['train','test']:
             raise ValueError("mode must be 'train' or 'test'")
         self.mode = mode
@@ -53,7 +53,7 @@ class HSI_MSI_Data(data.Dataset): # 读取数据集,预处理，数据增强等
         self.psf = psf
         self.srf = srf
         self.scale = scale_factor
-        self.noise = noise
+        self.blur = blur
         self.split = split
         self.normalize = normalize
         self.kernel_path = kernel_path
@@ -63,14 +63,13 @@ class HSI_MSI_Data(data.Dataset): # 读取数据集,预处理，数据增强等
             self.HrHSIs, self.HrMSIs, self.LrHSIs, self.realHrMSI= self.load_data()
 
     def load_data(self):
-        key = 'hsi'  # 默认高光谱图像键
+        key = 'hsi'  
 
         gt_dir = os.path.join(self.data_path, self.dataset, 'gt')
         LrHSI_dir = os.path.join(self.data_path, self.dataset, "scale"+str(self.scale)+"+"+self.kernel_path+"+"+self.srfname, 'LrHSI')
         HrMSI_dir = os.path.join(self.data_path, self.dataset, "scale"+str(self.scale)+"+"+self.kernel_path+"+"+self.srfname, 'HrMSI')
         img_names= self.split[self.mode]
 
-        #使用scipy读取mat文件
         all_gt = []
         all_HrMSI = []  
         all_LrHSI = []
@@ -85,7 +84,6 @@ class HSI_MSI_Data(data.Dataset): # 读取数据集,预处理，数据增强等
             LrHSI = sio.loadmat(LrHSI_path)['data']
             HrMSI = sio.loadmat(HrMSI_path)['data']
 
-            #将形状为(H,W,C)的高光谱图像转换为形状为(C,H,W)的高光谱图像
             gt = np.transpose(gt, (2, 0, 1))
             LrHSI = np.transpose(LrHSI, (2, 0, 1))
             HrMSI = np.transpose(HrMSI, (2, 0, 1))
@@ -98,7 +96,6 @@ class HSI_MSI_Data(data.Dataset): # 读取数据集,预处理，数据增强等
         HrMSIs = np.array(all_HrMSI, dtype=np.float32)
         LrHSIs = np.array(all_LrHSI, dtype=np.float32)
 
-        # 归一化
         if self.normalize:
 
             GTs = GTs / self.datarange
@@ -107,9 +104,8 @@ class HSI_MSI_Data(data.Dataset): # 读取数据集,预处理，数据增强等
         
         HrMSIs_real = HrMSIs.copy()
 
-        if self.noise > 0:
-            sigma = self.noise #高斯核标准差
-            # 使用getPSF函数生成的卷积核，并用spatial_blur函数对HrMSIs进行卷积
+        if self.blur > 0:
+            sigma = self.blur 
             blur_kernel, _ = getPSF(kernel_size=5, sigma=sigma, anisotropy=False, Gaussian=True, angle=0, predefined_kernel=None)
             HrMSIs = spatial_blur(blur_kernel, HrMSIs, scale=1)
 
@@ -118,12 +114,12 @@ class HSI_MSI_Data(data.Dataset): # 读取数据集,预处理，数据增强等
             return GTs, HrMSIs, LrHSIs, HrMSIs_real
 
         elif self.mode == 'train':
-            # 分块操作
+
             GT_patches = []
             HrMSI_patches = []
             LrHSI_patches = []
             for i in range(GTs.shape[0]):
-                # 分块操作
+
                 GT = GTs[i]
                 HrMSI = HrMSIs[i]
                 LrHSI = LrHSIs[i]
@@ -164,7 +160,7 @@ class HSI_MSI_Data(data.Dataset): # 读取数据集,预处理，数据增强等
             return  LrHSI, HrMSI, HrHSI, self.realHrMSI[index]
 
 
-class real_Data(data.Dataset): # 读取数据集,预处理，数据增强等
+class real_Data(data.Dataset): 
     def __init__(self, mode, split, dataset, aug=False, data_path='data', normalize=True):
         if mode not in ['train','test']:
             raise ValueError("mode must be 'train' or 'test'")
@@ -183,7 +179,6 @@ class real_Data(data.Dataset): # 读取数据集,预处理，数据增强等
         HrMSI_dir = os.path.join(self.data_path, self.dataset, 'hrmsi')
         img_names= self.split[self.mode]
 
-        #使用scipy读取mat文件
         all_gt = []
         all_HrMSI = []  
         all_LrHSI = []
@@ -197,7 +192,6 @@ class real_Data(data.Dataset): # 读取数据集,预处理，数据增强等
             LrHSI = sio.loadmat(LrHSI_path)['hsi']
             HrMSI = sio.loadmat(HrMSI_path)['msi']
 
-            #将形状为(H,W,C)的高光谱图像转换为形状为(C,H,W)的高光谱图像
             gt = np.transpose(gt, (2, 0, 1))
             LrHSI = np.transpose(LrHSI, (2, 0, 1))
             HrMSI = np.transpose(HrMSI, (2, 0, 1))
@@ -210,18 +204,14 @@ class real_Data(data.Dataset): # 读取数据集,预处理，数据增强等
         HrMSIs = np.array(all_HrMSI, dtype=np.float32)
         LrHSIs = np.array(all_LrHSI, dtype=np.float32)
 
-        # 归一化
         if self.normalize:
 
             GTs = (GTs + 0.012797) / 1.64148
             HrMSIs = (HrMSIs + 0.012797) / 1.64148
             LrHSIs = (LrHSIs + 0.012797) / 1.64148
         
-
         return GTs, HrMSIs, LrHSIs, HrMSIs
 
-
-            
     def __len__(self):
         return len(self.HrHSIs)
     
