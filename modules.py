@@ -1,19 +1,20 @@
-import torch
+# -----------------------------------------------------------------------------
+# If you use this code in your research, please cite our paper:
+# Blur-Resistant Hyperspectral Image Super-Resolution via Dual-Degradation Fusion Model
+# Thanks
+# -----------------------------------------------------------------------------
 import torch.nn as nn
 import torch.nn.functional as F
-
 
 class S1_Generator(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(S1_Generator, self).__init__()     
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
-            # nn.BatchNorm2d(out_channels),
             nn.LeakyReLU(negative_slope=0.1, inplace=True)  
         )
  
     def forward(self, L, A):
-        # 输入相加
         s = L + A
         s = self.conv1(s)   
         return s
@@ -23,12 +24,10 @@ class S2_Generator(nn.Module):
         super(S2_Generator, self).__init__()    
         self.conv1 = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            # nn.BatchNorm2d(out_channels),
             nn.LeakyReLU(negative_slope=0.1, inplace=True)  
         )
  
     def forward(self, L, Y_):
-        # 输入相加
         s = L + Y_
         s = self.conv1(s)
         return s
@@ -46,8 +45,6 @@ class CB_R(nn.Module):
     def forward(self, x):
         x1 = self.conv1(x)
         x2 = self.conv2(x1)  
-        # if x2.size == x.size:
-        #     x2=x+x2
         return x2
 
 class CB_B(nn.Module):
@@ -59,9 +56,7 @@ class CB_B(nn.Module):
 
 
     def forward(self, x):
-        x1 = self.conv1(x)  # 包含BN层
-        # if x1.size == x.size:
-        #     x1=x+x1
+        x1 = self.conv1(x)
         return x1
     
 class GX(nn.Module):
@@ -70,7 +65,6 @@ class GX(nn.Module):
         self.CB_R_down = CB_R(C, c)
         self.CB_R_up = CB_R(c, C)
         self.CB_B1 = CB_B(C, C)
-        #self.CB_B2 = CB_B(C, C)
 
         self.CB_B_inv = nn.Sequential(
             nn.ConvTranspose2d(C, C, kernel_size=3, stride=1, padding=1, output_padding=0, bias=False),
@@ -85,25 +79,14 @@ class GX(nn.Module):
         Y:[B,c,H,W]
         Z:[B,C,H,W]
         """
-
-        # 中间卷积计算
         x2 = self.CB_R_down(x)
         x2 = x2 - Y
         x2 = self.CB_R_up(x2) 
-
         x3 = self.CB_B1(x)
         x3 = x3 - Z
-        # x3 = self.CB_B2(x3)
-
-        # x3 = self.CB_B1(x)
-        # x3 = x3 - Z 
-        x3 = self.CB_B_inv(x3)   #这里发现使用转置卷积效果更好
-
-        x4 = x2 + x3    # [B, C, H, W]
-
+        x3 = self.CB_B_inv(x3) 
+        x4 = x2 + x3
         S = self.S1generator(L1/self.sigma1, x)  
-
-        # 最终外部加
         output = x4 + L1 + self.sigma1 * x - self.sigma1 * S
 
         return output
@@ -158,41 +141,28 @@ class XsolverUnit(nn.Module):
             nn.LeakyReLU(0.1, inplace=True))
 
     def forward(self, x):
-        """输入: [B, r, H, W]"""
         x1 = self.conv1(x)
-        # x_temp = self.conv3(x)
         x2 = self.conv2(x1)
 
         return x2 + x
-        
-        # return self.conv(x) + x 
-        # return self.conv(x)  
 
 
 class XSolver(nn.Module):
     def __init__(self, C):
-        """
-            C: X输入的通道数
-        """
         super(XSolver, self).__init__()
         
-        # 处理GX的Unit (B,C,H,W) -> (B,C,H,W)
         self.solver = XsolverUnit(
             in_channel=C,
             out_channel=C
         )
 
     def forward(self, GX):
-        # 基础特征处理
         delta_X = self.solver(GX) 
 
         return delta_X
 
 class YSolver(nn.Module):
     def __init__(self, c, C, sigma2):
-        """
-            c: Y输入的通道数
-        """
         super(YSolver, self).__init__()
         self.convInv = nn.Sequential(
             nn.Conv2d(c,c,3,1,1),
