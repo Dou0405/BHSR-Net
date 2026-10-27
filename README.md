@@ -1,5 +1,5 @@
 # BHSR-Net
-The official code for BHSR-Net: Blur-Resistant Hyperspectral Image Super-Resolution via Dual-Degradation Fusion Model
+The official code for BHSR-Net: Blur-Resistant Hyperspectral Image Super-Resolution via Dual-Degradation Fusion Model, TIP2026
 
 ## 1. Introduction
 This work has been published on IEEE Transactions on Image Processing, 2026.
